@@ -39,6 +39,25 @@ const ALL_PERSON = gql`
   }
 `;
 
+const hoge = gql`
+  fragment Hoge on AllPersons {
+    name
+  }
+`
+
+const ANOTHER_QUERY = gql`
+  ${hoge}
+  query WIP {
+    allPersons {
+      name
+      films {
+        director
+      }
+      ...Hoge
+    }
+  }
+`;
+
 const App: React.FC = () => {
   const { loading, error, data } = useQuery<AllPersons>(ALL_PERSON, { client });
 
