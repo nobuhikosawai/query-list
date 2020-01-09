@@ -1,24 +1,36 @@
-import ts from 'typescript';
+import ts, { ImportDeclaration, NamedImports, getTrailingCommentRanges } from 'typescript';
 import fs from 'fs';
 import { join } from 'path';
 import { findQueryFilenamAndNode, findQueryNode } from './utils/ts-utils';
 import { createLanguageServiceHost } from './languageServiceHost';
 
-const targetDir = './example';
-const tsconfigFilePath = './example/tsconfig.json';
-const tempOutputDir = './output';
-
-const filelist = fs.readdirSync(join(targetDir, 'src'), { withFileTypes: true });
-
 function isDefined<T>(argument: T | undefined): argument is T {
   return argument !== undefined
 }
 
-const tsFileList = filelist.map(file => {
-  if (/.*\.(tsx|ts)$/.test(file.name)) {
-    return join(targetDir, `src/${file.name}`)
+const targetDir = './example';
+const tsconfigFilePath = './example/tsconfig.json';
+const tempOutputDir = './output';
+
+const getTsFileList = (rootDir: string): string[] => {
+  const res: string[] = [];
+  const extractTsFileList = (dirName: string) => {
+    const contentList =  fs.readdirSync(join(dirName), { withFileTypes: true });
+
+    contentList.forEach(c => {
+      if (/.*\.(tsx|ts)$/.test(c.name)) {
+        res.push(join(dirName, c.name));
+      } else if (c.isDirectory()) {
+        extractTsFileList(join(dirName, c.name));
+      }
+    });
   }
-}).filter(isDefined);
+
+  extractTsFileList(rootDir);
+  return res;
+}
+
+const tsFileList = getTsFileList(join(targetDir, 'src'));
 
 const tsconfig = ts.parseConfigFileTextToJson(tsconfigFilePath, fs.readFileSync(tsconfigFilePath).toString()).config;
 const program = ts.createProgram(tsFileList, tsconfig);
@@ -48,7 +60,30 @@ queryFilenameAndNodes.forEach(filenameAndNode => {
               const { contextSpan } = info;
               if (!contextSpan) { return; }
               const tokenAtPosition = (ts as any).getTokenAtPosition(sourceFile, contextSpan.start); // HACK: using internal api
+
+              if (tokenAtPosition.kind === ts.SyntaxKind.ImportKeyword) {
+
+                const ancestor: ts.ImportDeclaration = (ts as any).findAncestor(tokenAtPosition, ts.isImportDeclaration);
+                const { importClause } = ancestor;
+                if (!importClause) { return; }
+                const { name, namedBindings } = importClause;
+                const importIdentifiers = [name, ...(namedBindings as ts.NamedImports).elements.map(el => el.name)].filter(isDefined);
+                const targetIdentifier = importIdentifiers.find(i => i.text === expression.text)
+                if (!targetIdentifier) { return; }
+                console.log('aaaaaaaaaaaaaaaaaaaa')
+                console.log(targetIdentifier)
+
+                const def = languageService.getDefinitionAtPosition(fileName, targetIdentifier.pos);
+
+                console.log('bbbbbbbbbbbbbbbb')
+                console.log(def)
+              }
+
               const ancestor = (ts as any).findAncestor(tokenAtPosition, ts.isVariableDeclarationList);
+
+              console.log(ancestor)
+
+
               const nodes = findQueryNode(ancestor, 'fragment');
               if (nodes.length > 0) {
                 const fragments = nodes.map(n => {
