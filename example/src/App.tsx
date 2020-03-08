@@ -7,6 +7,7 @@ import { HttpLink } from 'apollo-link-http';
 import { onError } from 'apollo-link-error';
 import gql from 'graphql-tag';
 import { AllPersons } from './__generated__/AllPersons';
+import { allPersonName } from './components/allPersonName';
 
 const link = ApolloLink.from([
   onError(({ graphQLErrors, networkError }) => {
@@ -39,21 +40,14 @@ const ALL_PERSON = gql`
   }
 `;
 
-const hoge = gql`
-  fragment Hoge on AllPersons {
-    name
-  }
-`
-
 const ANOTHER_QUERY = gql`
-  ${hoge}
+  ${allPersonName}
   query WIP {
     allPersons {
-      name
       films {
         director
       }
-      ...Hoge
+      ...AllPersonName
     }
   }
 `;
